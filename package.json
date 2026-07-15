@@ -2,6 +2,11 @@
   "name": "neon-strike-3d",
   "version": "1.0.0",
   "private": true,
-  "scripts": { "start": "node server.js" },
-  "dependencies": { "ws": "^8.18.0" }
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "three": "^0.185.1",
+    "ws": "^8.18.0"
+  }
 }

@@ -10,7 +10,7 @@ let nextId = 1, startedAt = Date.now(), roundEnded = false;
 const server = http.createServer((req, res) => {
   const file = req.url === '/' ? 'index.html' : req.url.slice(1);
   const safe = path.normalize(file).replace(/^([.][.][/\\])+/, '');
-  const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
+  const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.glb': 'model/gltf-binary' };
   fs.readFile(path.join(root, safe), (err, data) => { if (err) { res.writeHead(404); res.end('Not found'); return; } res.writeHead(200, { 'Content-Type': types[path.extname(safe)] || 'application/octet-stream' }); res.end(data); });
 });
 const wss = new WebSocket.Server({ server });

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x07111a); scene.fog = new THREE.Fog(0x07111a, 24, 68);
 const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, .1, 100); camera.rotation.order = 'YXZ';
@@ -6,22 +7,69 @@ const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(
 scene.add(new THREE.HemisphereLight(0x7dcae5, 0x10202c, 2)); const sun = new THREE.DirectionalLight(0xb9efff, 2); sun.position.set(5, 16, 8); sun.castShadow = true; scene.add(sun);
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), new THREE.MeshStandardMaterial({ color: 0x132633, roughness: .8, metalness: .3 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
 const grid = new THREE.GridHelper(50, 50, 0x2d8190, 0x193b4d); grid.position.y = .01; scene.add(grid);
-const walls = []; function box(x, z, w, d, h = 3, color = 0x203d4e, collision = true) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color, metalness: .55, roughness: .4 })); m.position.set(x, h / 2, z); m.castShadow = m.receiveShadow = true; scene.add(m); if (collision) walls.push({ x, z, w, d, h }); }
-function container(x, z, rotation = 0, color = 0x216d8a, stacked = false) { const group = new THREE.Group(); const material = new THREE.MeshStandardMaterial({ color, metalness: .65, roughness: .42 }); const shell = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.55, 6), material); shell.castShadow = shell.receiveShadow = true; group.add(shell); const ribMaterial = new THREE.MeshStandardMaterial({ color: 0x102a36, metalness: .8, roughness: .3 }); for (let i = -2.55; i <= 2.55; i += .5) { const rib = new THREE.Mesh(new THREE.BoxGeometry(2.56, 2.35, .07), ribMaterial); rib.position.set(0, 0, i); group.add(rib); } group.position.set(x, stacked ? 3.84 : 1.275, z); group.rotation.y = rotation; group.traverse(mesh => { mesh.castShadow = mesh.receiveShadow = true; }); scene.add(group); const w = Math.abs(Math.cos(rotation)) * 2.5 + Math.abs(Math.sin(rotation)) * 6, d = Math.abs(Math.sin(rotation)) * 2.5 + Math.abs(Math.cos(rotation)) * 6; walls.push({ x, z, w, d, h: stacked ? 5.1 : 2.55 }); }
-function crate(x, z, size = 1.15, height = 1.15) { const material = new THREE.MeshStandardMaterial({ color: 0x7b4925, roughness: .85 }); const wood = new THREE.Mesh(new THREE.BoxGeometry(size, height, size), material); wood.position.set(x, height / 2, z); wood.castShadow = wood.receiveShadow = true; scene.add(wood); const edge = new THREE.LineSegments(new THREE.EdgesGeometry(wood.geometry), new THREE.LineBasicMaterial({ color: 0xd69b55 })); edge.position.copy(wood.position); scene.add(edge); walls.push({ x, z, w: size, d: size, h: height }); }
-// 原创货运码头布局：集装箱提供掩体，木箱作为登上低集装箱的踏台。
+
+// 预加载模型
+const loader = new GLTFLoader();
+const modelCache = {};
+function loadModel(name) { return new Promise(resolve => { if (modelCache[name]) return resolve(modelCache[name].clone()); loader.load(`models/${name}.glb`, gltf => { modelCache[name] = gltf.scene; resolve(gltf.scene.clone()); }, undefined, () => resolve(null)); }); }
+
+// 士兵角色模板与动画
+let soldierTemplate = null, soldierAnimations = null;
+loader.load('models/soldier.glb', gltf => {
+  soldierTemplate = gltf.scene; soldierAnimations = gltf.animations;
+  soldierTemplate.traverse(mesh => { if (mesh.isMesh) mesh.castShadow = mesh.receiveShadow = true; });
+  soldierTemplate.scale.set(.9, .9, .9);
+}, undefined, console.error);
+
+const walls = [];
+function box(x, z, w, d, h = 3, color = 0x203d4e, collision = true) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color, metalness: .55, roughness: .4 }));
+  m.position.set(x, h / 2, z); m.castShadow = m.receiveShadow = true; scene.add(m);
+  if (collision) walls.push({ x, z, w, d, h });
+}
+
+// 用 GLB 模型放置集装箱
+const containerColorMap = { 0x177e9d: 'blue', 0xc13f3f: 'red', 0x366a9a: 'navy', 0xd0832d: 'orange', 0x2e8d63: 'green', 0x8b3f92: 'purple', 0x60727e: 'gray', 0x356ba5: 'navy', 0xb94747: 'red' };
+function placeContainer(x, z, rotation = 0, color = 0x177e9d, stacked = false) {
+  const colorName = containerColorMap[color] || 'blue';
+  loadModel(`container_${colorName}`).then(model => {
+    if (!model) return;
+    model.position.set(x, stacked ? 3.84 : 0, z);
+    model.rotation.y = rotation;
+    scene.add(model);
+  });
+  // 旋转后的碰撞盒
+  const rawW = 6, rawD = 2.5;
+  const w = Math.abs(Math.cos(rotation)) * rawW + Math.abs(Math.sin(rotation)) * rawD;
+  const d = Math.abs(Math.sin(rotation)) * rawW + Math.abs(Math.cos(rotation)) * rawD;
+  walls.push({ x, z, w, d, h: stacked ? 5.1 : 2.55 });
+}
+
+function placeCrate(x, z, height = 1.15) {
+  loadModel('crate').then(model => {
+    if (!model) return;
+    model.position.set(x, 0, z);
+    if (height !== 1.15) model.scale.set(1, height / 1.15, 1);
+    scene.add(model);
+  });
+  walls.push({ x, z, w: 1.15, d: 1.15, h: height });
+}
+
+// 场景布局
 box(0, -24, 50, 1, 5); box(0, 24, 50, 1, 5); box(-24, 0, 1, 50, 5); box(24, 0, 1, 50, 5);
-container(-10, -8, 0, 0x177e9d); container(-10, -2, 0, 0xc13f3f); container(-10, -8, 0, 0x356ba5, true); crate(-8.1, -8, 1.15, 1.2);
-container(9, 8, Math.PI / 2, 0xd0832d); container(15, 8, Math.PI / 2, 0x2e8d63); container(9, 8, Math.PI / 2, 0x8b3f92, true); crate(9, 5.9, 1.15, 1.2);
-container(-4, 12, Math.PI / 2, 0x366a9a); container(5, -13, Math.PI / 2, 0xb94747); container(0, 2, 0, 0x60727e); crate(2.1, 2, 1.1, 1.15);
-// 北侧墙面的霓虹招牌。
+placeContainer(-10, -8, 0, 0x177e9d); placeContainer(-10, -2, 0, 0xc13f3f); placeContainer(-10, -8, 0, 0x356ba5, true); placeCrate(-8.1, -8, 1.2);
+placeContainer(9, 8, Math.PI / 2, 0xd0832d); placeContainer(15, 8, Math.PI / 2, 0x2e8d63); placeContainer(9, 8, Math.PI / 2, 0x8b3f92, true); placeCrate(9, 5.9, 1.2);
+placeContainer(-4, 12, Math.PI / 2, 0x366a9a); placeContainer(5, -13, Math.PI / 2, 0xb94747); placeContainer(0, 2, 0, 0x60727e); placeCrate(2.1, 2, 1.15);
+
+// 霓虹招牌
 function neonSign(text) { const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 180; const context = canvas.getContext('2d'); context.clearRect(0, 0, canvas.width, canvas.height); context.font = '800 108px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle'; context.shadowColor = '#00f6ff'; context.shadowBlur = 28; context.strokeStyle = '#00dfe9'; context.lineWidth = 4; context.strokeText(text, 512, 91); context.fillStyle = '#ecffff'; context.fillText(text, 512, 91); const material = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, side: THREE.DoubleSide }); const sign = new THREE.Mesh(new THREE.PlaneGeometry(11, 1.94), material); sign.position.set(0, 3, -23.43); scene.add(sign); }
 neonSign('烟台小分队');
-const blueMat = new THREE.MeshStandardMaterial({ color: 0x20d8df, emissive: 0x07565e, metalness: .5 }), redMat = new THREE.MeshStandardMaterial({ color: 0xf04e68, emissive: 0x5b0b1c, metalness: .5 });
-const remotes = new Map(), raycaster = new THREE.Raycaster(), keys = {}, velocity = new THREE.Vector3(), effects = []; let socket, myId, joined = false, alive = true, ammo = 30, reloading = false, lastShot = 0, lastNetwork = 0, gunKick = 0, verticalVelocity = 0, sensitivity = 1;
+
+const remotes = new Map(), raycaster = new THREE.Raycaster(), keys = {}, velocity = new THREE.Vector3(), effects = [];
+let socket, myId, joined = false, alive = true, ammo = 30, reloading = false, lastShot = 0, lastNetwork = 0, gunKick = 0, verticalVelocity = 0, sensitivity = 1;
 const standingHeight = 1.6, crouchingHeight = 1.05, gravity = 17, jumpSpeed = 6.3;
 
-// 第一人称简易步枪模型，挂载到相机以保持在视野右下角。
+// 第一人称步枪模型
 const gun = new THREE.Group();
 const gunMetal = new THREE.MeshStandardMaterial({ color: 0x182631, metalness: .85, roughness: .28 });
 const gunAccent = new THREE.MeshStandardMaterial({ color: 0x28d9d5, emissive: 0x08716f, emissiveIntensity: 1.7, metalness: .5 });
@@ -33,8 +81,10 @@ gunPart(new THREE.BoxGeometry(.05, .035, .62), gunAccent, .34, -.14, -.72);
 gunPart(new THREE.BoxGeometry(.08, .1, .11), gunMetal, .34, -.11, -1.03);
 const muzzle = new THREE.Object3D(); muzzle.position.set(.34, -.25, -1.9); gun.add(muzzle);
 gun.position.set(.48, -.42, -.72); gun.rotation.set(-.12, -.18, 0); camera.add(gun); scene.add(camera);
+
 const hud = document.querySelector('#hud'), menu = document.querySelector('#menu'), respawn = document.querySelector('#respawn'), endPanel = document.querySelector('#end-panel');
-// 方块像素风人形：头、躯干、四肢均为独立方块，方便射线命中与动作表现。
+
+// 昵称标签
 function nicknameTag(name) {
   const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 48;
   const context = canvas.getContext('2d'); context.font = '700 25px sans-serif'; context.textAlign = 'center';
@@ -42,44 +92,61 @@ function nicknameTag(name) {
   context.strokeStyle = '#48e6df'; context.strokeRect(1, 4, 254, 38);
   context.fillStyle = '#efffff'; context.fillText(name, 128, 31);
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, depthWrite: false }));
-  sprite.position.y = 2.52; sprite.scale.set(1.55, .29, 1); return sprite;
+  sprite.position.y = 2.2; sprite.scale.set(1.55, .29, 1); return sprite;
 }
-function model(id, name) {
+
+// 用 Soldier 模型创建远端玩家
+function createPlayerModel(id, name) {
   const group = new THREE.Group();
-  const uniform = id.charCodeAt(0) % 2 ? blueMat : redMat;
-  const skin = new THREE.MeshStandardMaterial({ color: 0xd99a6d, roughness: .9 });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x17212b, roughness: .65, metalness: .25 });
-  const parts = {};
-  function part(name, size, material, x, y, z) {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
-    mesh.position.set(x, y, z); mesh.castShadow = mesh.receiveShadow = true; mesh.userData.playerId = id;
-    group.add(mesh); parts[name] = mesh; return mesh;
-  }
-  part('leftLeg', [.3, .78, .3], dark, -.19, .39, 0);
-  part('rightLeg', [.3, .78, .3], dark, .19, .39, 0);
-  part('body', [.78, .82, .38], uniform, 0, 1.17, 0);
-  part('head', [.62, .62, .62], skin, 0, 1.89, 0);
-  // 护目镜与阵营色肩章让远距离识别更明显。
-  part('visor', [.48, .13, .03], dark, 0, 1.94, -.325);
-  part('leftArm', [.25, .76, .28], uniform, -.53, 1.2, 0);
-  part('rightArm', [.25, .76, .28], uniform, .53, 1.2, -.08);
-  const rifle = part('rifle', [.12, .12, .78], dark, .57, .99, -.46); rifle.rotation.x = -.18;
   group.add(nicknameTag(name));
-  group.userData.parts = parts; scene.add(group); return group;
+  if (soldierTemplate) {
+    const clone = soldierTemplate.clone();
+    clone.traverse(mesh => { if (mesh.isMesh) mesh.userData.playerId = id; });
+    group.add(clone);
+    group.userData.hasSoldier = true;
+    // 初始化动画混合器
+    if (soldierAnimations) {
+      const mixer = new THREE.AnimationMixer(clone);
+      const actions = {};
+      soldierAnimations.forEach(clip => { actions[clip.name] = mixer.clipAction(clip); });
+      // 默认播放 Idle
+      if (actions.Idle) actions.Idle.play();
+      group.userData.mixer = mixer;
+      group.userData.actions = actions;
+    }
+  } else {
+    // 模型未加载完成时用简易方块占位
+    const fallback = new THREE.Mesh(new THREE.CapsuleGeometry(.42, 1.1, 5, 10), new THREE.MeshStandardMaterial({ color: 0xaaaaaa }));
+    fallback.position.y = 1.05; fallback.castShadow = true; fallback.userData.playerId = id;
+    group.add(fallback);
+  }
+  scene.add(group); return group;
 }
+
 function animateRemote(remote, time) {
   remote.mesh.position.y = remote.data.y - standingHeight + (remote.data.crouching ? -.38 : 0);
   remote.mesh.scale.y = remote.data.crouching ? .77 : 1;
-  const parts = remote.mesh.userData.parts; if (!parts) return;
-  const swing = remote.walking ? Math.sin(time * .011) * .58 : 0;
-  parts.leftLeg.rotation.x = swing; parts.rightLeg.rotation.x = -swing;
-  parts.leftArm.rotation.x = -swing * .7; parts.rightArm.rotation.x = swing * .35 - .3;
+  // 切换动画状态
+  const actions = remote.mesh.userData.actions;
+  if (actions) {
+    const currentAction = remote.walking ? (actions.Run || actions.Walk) : actions.Idle;
+    const prevAction = remote.mesh.userData.currentAction;
+    if (currentAction && currentAction !== prevAction) {
+      if (prevAction) prevAction.fadeOut(.2);
+      currentAction.reset().fadeIn(.2).play();
+      remote.mesh.userData.currentAction = currentAction;
+    }
+  }
+  // 更新动画混合器
+  const mixer = remote.mesh.userData.mixer;
+  if (mixer) mixer.update(.016);
 }
+
 function collides(x, z, eyeY) { return walls.some(b => x > b.x - b.w / 2 - .45 && x < b.x + b.w / 2 + .45 && z > b.z - b.d / 2 - .45 && z < b.z + b.d / 2 + .45 && eyeY < b.h + 1.1); }
 function platformHeight(x, z) { return walls.reduce((top, b) => x > b.x - b.w / 2 - .32 && x < b.x + b.w / 2 + .32 && z > b.z - b.d / 2 - .32 && z < b.z + b.d / 2 + .32 ? Math.max(top, b.h) : top, 0); }
 function join(name) { socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`); socket.onopen = () => socket.send(JSON.stringify({ type: 'join', name })); socket.onmessage = event => receive(JSON.parse(event.data)); }
 function receive(data) { if (data.type === 'welcome') { myId = data.id; joined = true; menu.classList.add('hidden'); hud.classList.remove('hidden'); camera.position.set(data.x, 1.6, data.z); document.body.requestPointerLock(); notice('死斗模式：所有玩家均为敌人'); }
- if (data.type === 'state') { document.querySelector('#timer').textContent = `${String(Math.floor(data.time / 60)).padStart(2,'0')}:${String(data.time % 60).padStart(2,'0')}`; const board = document.querySelector('#leaderboard'); board.replaceChildren(...data.leaderboard.map((player, index) => { const item = document.createElement('li'); item.className = player.id === myId ? 'me' : ''; item.textContent = `${index + 1}. ${player.name}`; const kills = document.createElement('b'); kills.textContent = player.kills; item.append(kills); return item; })); const me = data.players.find(player => player.id === myId); if (me) document.querySelector('#my-kills').textContent = me.kills; const seen = new Set(); data.players.forEach(p => { if (p.id === myId) return; seen.add(p.id); let r = remotes.get(p.id); if (!r) { r = { mesh: model(p.id, p.name), data: p, walking: false }; remotes.set(p.id, r); } r.walking = Math.hypot(p.x - r.data.x, p.z - r.data.z) > .015; r.data = p; r.mesh.visible = !p.dead; r.mesh.position.set(p.x, 0, p.z); r.mesh.rotation.y = p.yaw; }); remotes.forEach((r,id) => { if (!seen.has(id)) { scene.remove(r.mesh); remotes.delete(id); } }); }
+ if (data.type === 'state') { document.querySelector('#timer').textContent = `${String(Math.floor(data.time / 60)).padStart(2,'0')}:${String(data.time % 60).padStart(2,'0')}`; const board = document.querySelector('#leaderboard'); board.replaceChildren(...data.leaderboard.map((player, index) => { const item = document.createElement('li'); item.className = player.id === myId ? 'me' : ''; item.textContent = `${index + 1}. ${player.name}`; const kills = document.createElement('b'); kills.textContent = player.kills; item.append(kills); return item; })); const me = data.players.find(player => player.id === myId); if (me) document.querySelector('#my-kills').textContent = me.kills; const seen = new Set(); data.players.forEach(p => { if (p.id === myId) return; seen.add(p.id); let r = remotes.get(p.id); if (!r) { r = { mesh: createPlayerModel(p.id, p.name), data: p, walking: false }; remotes.set(p.id, r); } r.walking = Math.hypot(p.x - r.data.x, p.z - r.data.z) > .015; r.data = p; r.mesh.visible = !p.dead; r.mesh.position.set(p.x, 0, p.z); r.mesh.rotation.y = p.yaw; }); remotes.forEach((r,id) => { if (!seen.has(id)) { scene.remove(r.mesh); remotes.delete(id); } }); }
  if (data.type === 'hit' && data.victim === myId) { document.querySelector('#health').textContent = Math.max(0, +document.querySelector('#health').textContent - 34); document.querySelector('#health').classList.toggle('low', +document.querySelector('#health').textContent <= 34); const flash = document.querySelector('#damage-flash'); flash.classList.add('active'); setTimeout(() => flash.classList.remove('active'), 130); }
  if (data.type === 'kill') { feed(`<strong>${data.killerName}</strong> ▸ ${data.victimName}`); if (data.victim === myId) die(); }
  if (data.type === 'respawn' && data.victim === myId) { camera.position.set(data.x, data.y, data.z); ammo = 30; reloading = false; verticalVelocity = 0; document.querySelector('.weapon strong').textContent = ammo; }
