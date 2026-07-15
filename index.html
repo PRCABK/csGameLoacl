@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NEON STRIKE · 3D 对战</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="hud" class="hidden">
+    <div class="team-score"><span class="cyan" id="my-kills">0</span><small>我的击杀</small><b id="timer">10:00</b><small>死斗模式</small></div>
+    <ol id="leaderboard"></ol>
+    <div id="crosshair">+</div>
+    <div class="weapon">MX-9 <i></i><strong>30</strong><small>/ ∞</small></div>
+    <div class="health"><span>生命</span><b id="health">100</b></div>
+    <div id="kill-feed"></div>
+    <div id="notice"></div>
+  </div>
+  <section id="menu">
+    <p class="eyebrow">REALTIME MULTIPLAYER // BETA</p>
+    <h1>NEON <em>STRIKE</em></h1>
+    <p class="subtitle">3D 死斗竞技场</p>
+    <form id="join-form">
+      <label for="player-name">特工代号</label>
+      <input id="player-name" maxlength="14" value="Rookie" autocomplete="off" />
+      <label for="sensitivity">鼠标灵敏度 <output id="sensitivity-value">1.0</output></label>
+      <input id="sensitivity" type="range" min="0.2" max="2" step="0.1" value="1" />
+      <button type="submit">部署进入战区 <span>→</span></button>
+    </form>
+    <p class="help">WASD 移动　SHIFT 奔跑　SPACE 跳跃　C 下蹲　鼠标瞄准 / 射击　R 装填</p>
+  </section>
+  <section id="respawn" class="panel hidden"><p>你已阵亡</p><strong id="respawn-count">3</strong><small>秒后重新部署</small></section>
+  <section id="end-panel" class="panel hidden"><p id="winner">战局结束</p><button onclick="location.reload()">返回大厅</button></section>
+  <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.161.0/build/three.module.js"}}</script>
+  <script type="module" src="game.js"></script>
+</body>
+</html>
