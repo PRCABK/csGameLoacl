@@ -6,16 +6,23 @@
 
 ## Overview
 
-The backend is intentionally small and currently lives in a single CommonJS entry file: `server.js`. It combines static file serving, WebSocket room management, game state updates, and the HTTP server bootstrap.
+The backend is intentionally small and uses CommonJS modules under `server/`. The root `server.js` remains a compatibility entry point for `npm start`; `server/index.js` is the composition root that starts HTTP and WebSocket handling.
 
-There is no `src/` directory, route framework, service layer, or build step for backend code.
+There is no `src/` directory, route framework, service layer, dependency-injection container, or build step for backend code.
 
 ---
 
 ## Directory Layout
 
 ```
-server.js              # HTTP static server, WebSocket server, rooms, gameplay events
+server.js              # Compatibility entry: require('./server/index.js')
+server/
+├── index.js           # HTTP/WS composition, connections, tick loop, listen
+├── maps.js            # Map data, default map, map ID normalization
+├── rooms.js           # The sole rooms Map, room lifecycle, spawning
+├── snapshots.js       # Team scores, scoreboards, state snapshots
+├── staticFiles.js     # Static request handler and Content-Type mapping
+└── combat.js          # Authoritative hit, kill, and respawn behavior
 package.json           # npm metadata and the `start` script
 client/                # browser ES modules served as static assets
 models/                # GLB assets served by the static file handler
@@ -28,15 +35,18 @@ docs/                  # static landing page assets
 
 ## Module Organization
 
-Keep backend changes in `server.js` unless a task explicitly plans a module split. Existing helper functions are grouped by behavior:
+Keep behavior in the module that owns its state or responsibility:
 
-- Configuration constants: `ROUND_SECONDS`, `DAMAGE`, `RESPAWN_MS`, `MAPS`, `DEFAULT_MAP`.
-- Room helpers: `roomKey`, `normalizeMapId`, `createRoom`, `getOrCreateRoom`.
-- Gameplay helpers: `startRound`, `spawn`, `teamScores`, `scoreboard`, `snapshot`.
-- Transport helpers: `send`, `roomBroadcast`.
-- Runtime handlers: `http.createServer(...)`, `wss.on('connection', ...)`, and the `setInterval(...)` tick.
+- `maps.js` owns immutable map configuration and map ID normalization.
+- `rooms.js` owns the only process-wide `rooms` collection plus room and spawn helpers.
+- `snapshots.js` derives outgoing state without owning room data.
+- `staticFiles.js` handles HTTP filesystem mapping without depending on game modules.
+- `combat.js` owns authoritative combat transitions and receives the broadcast helper as a parameter.
+- `index.js` owns transport helpers, connection-local state, the 50 ms loop, and server startup.
 
-When adding backend behavior, prefer another small helper near the related group instead of introducing a new abstraction prematurely.
+Dependency direction must stay toward leaf modules: `maps.js` has no project dependency; `rooms.js` and `snapshots.js` may depend on maps; combat may depend on room spawning; `index.js` composes all modules. Leaf modules must not import `index.js`. Pass transport callbacks such as `roomBroadcast` into gameplay helpers to avoid circular dependencies.
+
+Keep `server.js` free of application logic so `npm start -> node server.js` remains a stable external contract. Prefer a small helper in the owning module instead of introducing classes, containers, or framework layers.
 
 ---
 
@@ -52,6 +62,7 @@ When adding backend behavior, prefer another small helper near the related group
 
 ## Examples
 
-- `server.js` defines map configuration in `MAPS` and validates map IDs with `normalizeMapId`.
-- `server.js` stores active rooms in the in-memory `rooms` map keyed by `mode:mapId`.
-- `server.js` builds client snapshots with `snapshot(room)` before broadcasting state every 50 ms.
+- `server/maps.js` defines `MAPS` and validates map IDs with `normalizeMapId`.
+- `server/rooms.js` stores active rooms in its single in-memory `rooms` map keyed by `mode:mapId`.
+- `server/index.js` broadcasts `snapshot(room)` every 50 ms.
+- `server/combat.js` accepts `roomBroadcast` as an argument instead of importing the composition root.

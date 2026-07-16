@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/index.md","reason":"核对后端指南覆盖范围"}
+{"file":".trellis/spec/backend/directory-structure.md","reason":"检查模块边界与 CommonJS 风格一致性"}
+{"file":".trellis/spec/backend/error-handling.md","reason":"检查输入边界、断线与过期定时器行为"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"检查协议兼容、服务端权威、房间隔离和验证要求"}

@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/index.md","reason":"加载当前后端架构与相关指南索引"}
+{"file":".trellis/spec/backend/directory-structure.md","reason":"遵循当前 CommonJS 服务端组织与命名方式"}
+{"file":".trellis/spec/backend/error-handling.md","reason":"保持 WebSocket 输入守卫和定时器过期保护"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"保持服务端权威、房间隔离、协议兼容和清理要求"}
