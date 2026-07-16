@@ -61,6 +61,21 @@ npm start
 http://localhost:3000
 ```
 
+## 宣传页（GitHub Pages）
+
+仓库内置宣传落地页：`docs/index.html`。
+
+启用方式：
+
+1. GitHub 仓库 → **Settings** → **Pages**
+2. Source 选择 **Deploy from a branch**
+3. Branch 选 `main`，目录选 `/docs`
+4. 保存后访问：
+
+```text
+https://prcabk.github.io/csGameLoacl/
+```
+
 ## 局域网联机
 
 1. 主机执行 `npm start`
