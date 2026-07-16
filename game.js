@@ -567,6 +567,7 @@ let lastCameraXZ = null;
 let ignoreTeleportUntil = 0; // 允许传送的时间窗（welcome/respawn）
 let mouseLookReadyAt = 0; // 重新锁鼠后短时间忽略尖峰 movement
 const standingHeight = 1.6, crouchingHeight = 1.05, gravity = 17, jumpSpeed = 6.3;
+const REMOTE_SMOOTHING = .35;
 const MAP_HALF = 25, RADAR_RANGE = 28, SPOT_DURATION = 2500, SPOT_FOV = .85, SPOT_MAX_DIST = 38, FIRE_REVEAL_MS = 2200;
 
 // 第一人称武器：复活时随机切换
@@ -772,9 +773,23 @@ function attachSoldier(group, id, team = group.userData.team) {
   group.userData.currentAction = base || null;
 }
 
+function remoteMeshY(data) {
+  return data.y - standingHeight + (data.crouching ? -.38 : 0);
+}
+
+function lerpAngle(current, target, alpha) {
+  const diff = Math.atan2(Math.sin(target - current), Math.cos(target - current));
+  return current + diff * alpha;
+}
+
 function animateRemote(remote) {
   if (soldierReady) attachSoldier(remote.mesh, remote.data.id, remote.data.team);
-  remote.mesh.position.y = remote.data.y - standingHeight + (remote.data.crouching ? -.38 : 0);
+  if (remote.targetPosition && !remote.data.dead) {
+    remote.mesh.position.lerp(remote.targetPosition, REMOTE_SMOOTHING);
+    remote.mesh.rotation.y = lerpAngle(remote.mesh.rotation.y, remote.targetYaw || 0, REMOTE_SMOOTHING);
+  } else {
+    remote.mesh.position.y = remoteMeshY(remote.data);
+  }
   remote.mesh.scale.y = remote.data.crouching ? .77 : 1;
 
   const actions = remote.mesh.userData.actions;
@@ -1074,13 +1089,28 @@ function receive(data) {
       if (p.id === myId) return;
       seen.add(p.id);
       let r = remotes.get(p.id);
-      if (!r) { r = { mesh: createPlayerModel(p.id, p.name, p.team), data: p, walking: false }; remotes.set(p.id, r); }
-      r.walking = Math.hypot(p.x - r.data.x, p.z - r.data.z) > .015;
+      if (!r) {
+        r = {
+          mesh: createPlayerModel(p.id, p.name, p.team),
+          data: p,
+          targetPosition: new THREE.Vector3(p.x, remoteMeshY(p), p.z),
+          targetYaw: p.yaw || 0,
+          walking: false,
+        };
+        r.mesh.position.copy(r.targetPosition);
+        r.mesh.rotation.y = r.targetYaw;
+        remotes.set(p.id, r);
+      }
+      r.walking = Math.hypot(p.x - r.targetPosition.x, p.z - r.targetPosition.z) > .015;
       const wasDead = !!r.data?.dead;
       r.data = p;
       r.mesh.visible = !p.dead;
-      r.mesh.position.set(p.x, 0, p.z);
-      r.mesh.rotation.y = p.yaw;
+      r.targetPosition.set(p.x, remoteMeshY(p), p.z);
+      r.targetYaw = p.yaw || 0;
+      if (p.dead || (wasDead && !p.dead) || r.mesh.position.distanceTo(r.targetPosition) > 3) {
+        r.mesh.position.copy(r.targetPosition);
+        r.mesh.rotation.y = r.targetYaw;
+      }
       // 复活重新显示时清掉命中闪白残留
       if (wasDead && !p.dead) clearHitFlash(r.mesh);
       if (p.dead) clearHitFlash(r.mesh);
@@ -1279,27 +1309,43 @@ function shoot() {
   raycaster.setFromCamera(new THREE.Vector2(), camera);
   const direction = new THREE.Vector3(); camera.getWorldDirection(direction);
   const end = camera.position.clone().addScaledVector(direction, 45);
-  const targets = [...remotes.values()].filter(r => {
+  const targetRemotes = [...remotes.values()].filter(r => {
     if (r.data.dead) return false;
     if (isAlly(r.data)) return false;
     return true;
-  }).map(r => r.mesh);
-  const hit = raycaster.intersectObjects(targets, true)[0];
-  if (hit) {
-    end.copy(hit.point);
-    const targetId = findPlayerId(hit.object);
-    const isPlayer = !!targetId;
-    addImpact(hit.point, isPlayer);
-    if (targetId) {
-      spotEnemy(targetId);
-      revealFire(targetId, 1200);
-      flashRemoteHit(targetId);
-      pulseCrosshair('hit');
-      showHitMarker(false);
-      socket.send(JSON.stringify({ type: 'shoot', target: targetId }));
+  });
+  const restoreTransforms = targetRemotes.map(r => ({
+    remote: r,
+    position: r.mesh.position.clone(),
+    yaw: r.mesh.rotation.y,
+  }));
+  try {
+    targetRemotes.forEach(r => {
+      r.mesh.position.copy(r.targetPosition || new THREE.Vector3(r.data.x, remoteMeshY(r.data), r.data.z));
+      r.mesh.rotation.y = r.targetYaw || 0;
+    });
+    const hit = raycaster.intersectObjects(targetRemotes.map(r => r.mesh), true)[0];
+    if (hit) {
+      end.copy(hit.point);
+      const targetId = findPlayerId(hit.object);
+      const isPlayer = !!targetId;
+      addImpact(hit.point, isPlayer);
+      if (targetId) {
+        spotEnemy(targetId);
+        revealFire(targetId, 1200);
+        flashRemoteHit(targetId);
+        pulseCrosshair('hit');
+        showHitMarker(false);
+        socket.send(JSON.stringify({ type: 'shoot', target: targetId }));
+      }
+    } else {
+      addImpact(end, false);
     }
-  } else {
-    addImpact(end, false);
+  } finally {
+    restoreTransforms.forEach(({ remote, position, yaw }) => {
+      remote.mesh.position.copy(position);
+      remote.mesh.rotation.y = yaw;
+    });
   }
   addShotEffect(end); if (!ammo) reload();
 }
