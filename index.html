@@ -8,31 +8,74 @@
 </head>
 <body>
   <div id="hud" class="hidden">
-    <div class="team-score"><span class="cyan" id="my-kills">0</span><small>我的击杀</small><b id="timer">10:00</b><small>死斗模式</small></div>
+    <div class="team-score">
+      <span class="cyan" id="score-left">0</span>
+      <small id="score-left-label">我的击杀</small>
+      <b id="timer">10:00</b>
+      <small id="mode-label">死斗模式</small>
+      <span class="red hidden" id="score-right">0</span>
+      <small class="hidden" id="score-right-label">蓝队</small>
+    </div>
     <ol id="leaderboard"></ol>
+    <div id="minimap-wrap"><canvas id="minimap" width="220" height="220"></canvas></div>
     <div id="damage-flash"></div>
     <div id="crosshair">+</div>
-    <div class="weapon">MX-9 <i></i><strong>30</strong><small>/ ∞</small></div>
+    <div class="weapon">WEAPON <i></i><strong>30</strong><small>/ ∞</small></div>
     <div class="health"><span>生命</span><b id="health">100</b></div>
     <div id="kill-feed"></div>
     <div id="notice"></div>
+    <div id="tab-scoreboard" class="hidden">
+      <div class="tab-title">计分板 <span>TAB</span></div>
+      <div id="tab-body"></div>
+    </div>
   </div>
   <section id="menu">
     <p class="eyebrow">REALTIME MULTIPLAYER // BETA</p>
     <h1>NEON <em>STRIKE</em></h1>
-    <p class="subtitle">3D 死斗竞技场</p>
+    <p class="subtitle">3D 局域网对战</p>
     <form id="join-form">
       <label for="player-name">特工代号</label>
       <input id="player-name" maxlength="14" value="Rookie" autocomplete="off" />
+
+      <label>游戏模式</label>
+      <div class="mode-pick" id="mode-pick">
+        <button type="button" class="mode-btn active" data-mode="dm">死斗</button>
+        <button type="button" class="mode-btn" data-mode="tdm">团队竞技</button>
+      </div>
+
+      <div id="team-pick-wrap" class="hidden">
+        <label>选择阵营</label>
+        <div class="team-pick" id="team-pick">
+          <button type="button" class="team-btn red active" data-team="red">红方</button>
+          <button type="button" class="team-btn blue" data-team="blue">蓝方</button>
+        </div>
+      </div>
+
+      <label>选择地图</label>
+      <div class="map-pick" id="map-pick">
+        <button type="button" class="map-btn active" data-map="neon_dock">霓虹码头</button>
+        <button type="button" class="map-btn" data-map="dust2">炽热沙城</button>
+        <button type="button" class="map-btn" data-map="town">风情小镇</button>
+        <button type="button" class="map-btn" data-map="warehouse">货运仓库</button>
+      </div>
+
       <label for="sensitivity">鼠标灵敏度 <output id="sensitivity-value">1.0</output></label>
       <input id="sensitivity" type="range" min="0.2" max="2" step="0.1" value="1" />
       <button type="submit">部署进入战区 <span>→</span></button>
     </form>
-    <p class="help">WASD 移动　SHIFT 奔跑　SPACE 跳跃　C 下蹲　鼠标瞄准 / 射击　R 装填</p>
+    <p class="help">WASD 移动　SHIFT 奔跑　SPACE 跳跃　C 下蹲　鼠标瞄准 / 射击　R 装填　TAB 计分板　ESC 菜单</p>
   </section>
   <section id="respawn" class="panel hidden"><p>你已阵亡</p><strong id="respawn-count">3</strong><small>秒后重新部署</small></section>
   <section id="end-panel" class="panel hidden"><p id="winner">战局结束</p><button onclick="location.reload()">返回大厅</button></section>
-  <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.161.0/build/three.module.js"}}</script>
+  <section id="pause-panel" class="panel hidden">
+    <p>是否返回大厅？</p>
+    <small>退出后将断开当前战局连接</small>
+    <div class="pause-actions">
+      <button type="button" id="pause-continue">继续游戏</button>
+      <button type="button" id="pause-lobby" class="danger">返回大厅</button>
+    </div>
+  </section>
+  <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.185.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.185.0/examples/jsm/"}}</script>
   <script type="module" src="game.js"></script>
 </body>
 </html>
