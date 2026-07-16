@@ -120,8 +120,20 @@ New-NetFirewallRule -DisplayName "NEON STRIKE TCP 3000" -Direction Inbound -Prot
 ```text
 ├── index.html
 ├── style.css
-├── game.js          # 客户端渲染 / 输入 / 表现
-├── server.js        # 房间、模式、地图、伤害与结算
+├── game.js          # 客户端兼容入口，加载 client/main.js
+├── client/
+│   ├── main.js      # 客户端玩法、网络、输入、HUD 与主循环
+│   ├── constants.js # 共享常量、武器与队伍辅助函数
+│   ├── scene.js     # Three.js 场景、渲染器与碰撞基础设施
+│   └── assets.js    # GLB 加载、缓存与资源释放
+├── server.js        # npm start 兼容入口，加载 server/index.js
+├── server/
+│   ├── index.js     # HTTP/WebSocket 组装、连接与更新循环
+│   ├── maps.js      # 地图配置与地图 ID 归一化
+│   ├── rooms.js     # 房间状态、回合与出生逻辑
+│   ├── snapshots.js # 状态快照、比分与计分板
+│   ├── staticFiles.js # 静态文件服务
+│   └── combat.js    # 命中、击杀与复活
 ├── models/          # 角色 / 枪械 / 场景 GLB
 ├── package.json
 └── README.md
