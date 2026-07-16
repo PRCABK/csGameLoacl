@@ -8,13 +8,11 @@ const PALETTE = {
   warn: 0xf3c945,
   red: 0xff5a6e,
   blue: 0x4aa7ff,
-  ink: 0x243140,
   concrete: 0x9aa8b4,
   concreteDark: 0x7f8d98,
   metal: 0x6d7f8c,
   metalDark: 0x556672,
   wood: 0xc48a4a,
-  woodDark: 0x9a6a36,
   sand: 0xd6b87a,
   sandDark: 0xb8955a,
   sandWall: 0xc9a66f,
@@ -89,9 +87,28 @@ const walls = []; // {x,z,w,d,h,climbable}
 function box(x, z, w, d, h = 3, color = PALETTE.concrete, collision = true, style = 'wall', climbable = false) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), makeMat(color, style));
   m.position.set(x, h / 2, z); m.castShadow = m.receiveShadow = true; scene.add(m);
-  // 默认可碰撞但不可站立，避免贴墙时镜头被当成平台反复抬升
   if (collision) walls.push({ x, z, w, d, h, climbable: !!climbable });
   return m;
+}
+
+function eachMaterial(root, fn) {
+  root.traverse(obj => {
+    if (!obj.isMesh || !obj.material) return;
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    mats.forEach(fn);
+  });
+}
+
+function teamColor(team, fallback = PALETTE.accent) {
+  if (team === 'red') return PALETTE.red;
+  if (team === 'blue') return PALETTE.blue;
+  return fallback;
+}
+
+function teamLabel(team) {
+  if (team === 'red') return '红';
+  if (team === 'blue') return '蓝';
+  return '';
 }
 
 // ---------- GLB 模型加载 ----------
@@ -233,24 +250,22 @@ function buildCrateFallback(size = 1.15) {
 // 阵营着色：让第三人称角色更易辨识
 function tintTeamModel(root, team) {
   if (!root || !team) return;
-  const teamColor = new THREE.Color(team === 'red' ? PALETTE.red : PALETTE.blue);
+  const color = new THREE.Color(teamColor(team));
   root.traverse(mesh => {
     if (!mesh.isMesh || !mesh.material) return;
-    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    const next = mats.map(mat => {
+    const tint = mat => {
       const c = mat.clone();
-      if (c.color) c.color.lerp(teamColor, .38);
-      c.emissive = teamColor.clone();
+      if (c.color) c.color.lerp(color, .38);
+      c.emissive = color.clone();
       c.emissiveIntensity = .08;
       return c;
-    });
-    mesh.material = Array.isArray(mesh.material) ? next : next[0];
+    };
+    mesh.material = Array.isArray(mesh.material)
+      ? mesh.material.map(tint)
+      : tint(mesh.material);
   });
 }
 
-// placeContainer / placeCrate 在地图系统中覆盖定义（带 map token 与 climbable）
-
-// 卡通招牌（弱霓虹，偏可读）
 function neonSign(text, x = 0, z = -23.43, accent = '#33e6e2') {
   const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 180;
   const context = canvas.getContext('2d');
@@ -368,11 +383,9 @@ function clearMap() {
   leftovers.forEach(disposeObject);
 }
 
-// 给 box 增强：追踪可清理 mesh + 材质风格
-const _box = box;
 function boxTracked(x, z, w, d, h = 3, color = PALETTE.concrete, collision = true, style = 'wall') {
   const before = scene.children.length;
-  _box(x, z, w, d, h, color, collision, style);
+  box(x, z, w, d, h, color, collision, style);
   for (let i = before; i < scene.children.length; i++) trackMapObject(scene.children[i]);
 }
 
@@ -381,26 +394,23 @@ function placeContainer(x, z, rotation = 0, color = 0x177e9d, stacked = false) {
   const y = stacked ? 2.55 : 0;
   const token = mapBuildToken;
   loadContainerTemplate().then(template => {
-    if (token !== mapBuildToken) return; // 地图已切换，丢弃
+    if (token !== mapBuildToken) return;
     const model = template ? template.clone(true) : buildContainerFallback(color);
     model.traverse(mesh => {
       if (!mesh.isMesh || !mesh.material) return;
-      if (Array.isArray(mesh.material)) {
-        mesh.material = mesh.material.map(m => {
-          const c = m.clone();
-          if (c.color) c.color.lerp(new THREE.Color(color), .3);
-          return c;
-        });
-      } else {
-        mesh.material = mesh.material.clone();
-        if (mesh.material.color) mesh.material.color.lerp(new THREE.Color(color), .3);
-      }
+      const tint = mat => {
+        const c = mat.clone();
+        if (c.color) c.color.lerp(new THREE.Color(color), .3);
+        return c;
+      };
+      mesh.material = Array.isArray(mesh.material)
+        ? mesh.material.map(tint)
+        : tint(mesh.material);
     });
     model.position.set(x, y, z);
     model.rotation.y = rotation;
     model.userData.mapProp = true;
     scene.add(model);
-    // 再次确认代数，防止 then 中途切图
     if (token !== mapBuildToken) { disposeObject(model); return; }
     mapProps.push(model);
   });
@@ -547,16 +557,17 @@ function loadMap(mapId) {
 
 const remotes = new Map(), raycaster = new THREE.Raycaster(), keys = {}, velocity = new THREE.Vector3(), effects = [];
 const spottedEnemies = new Map(); // id -> 消失时间戳
+const fireReveals = new Map(); // id -> 开火暴露结束时间
+let selfFireRevealUntil = 0;
 let socket, myId, joined = false, alive = true, ammo = 30, reloading = false, lastShot = 0, lastNetwork = 0, gunKick = 0, verticalVelocity = 0, sensitivity = 1;
 let gameMode = 'dm', myTeam = null, tabHeld = false, selectedMode = 'dm', selectedTeam = 'red', selectedMap = 'neon_dock', currentMapId = 'neon_dock';
-let intentionalUnlock = false; // 主动解锁鼠标时，不自动弹暂停
 let pendingRespawnTimer = null;
 let lastDeathId = 0;
 let lastCameraXZ = null;
 let ignoreTeleportUntil = 0; // 允许传送的时间窗（welcome/respawn）
 let mouseLookReadyAt = 0; // 重新锁鼠后短时间忽略尖峰 movement
 const standingHeight = 1.6, crouchingHeight = 1.05, gravity = 17, jumpSpeed = 6.3;
-const MAP_HALF = 25, RADAR_RANGE = 28, SPOT_DURATION = 2500, SPOT_FOV = .85, SPOT_MAX_DIST = 38;
+const MAP_HALF = 25, RADAR_RANGE = 28, SPOT_DURATION = 2500, SPOT_FOV = .85, SPOT_MAX_DIST = 38, FIRE_REVEAL_MS = 2200;
 
 // 第一人称武器：复活时随机切换
 const gun = new THREE.Group();
@@ -572,7 +583,6 @@ const WEAPONS = [
 ];
 const weaponModels = new Map(); // id -> THREE.Object3D
 let currentWeaponId = null;
-let weaponsReady = false;
 
 function prepareWeaponModel(gltf, length = 0.95, flip = true) {
   const model = gltf.scene.clone(true);
@@ -652,7 +662,6 @@ function equipRandomWeapon(excludeCurrent = true) {
 Promise.all(WEAPONS.map(w => loadGltf(w.url).then(gltf => {
   if (gltf) weaponModels.set(w.id, prepareWeaponModel(gltf, w.length, w.flip));
 }))).then(() => {
-  weaponsReady = true;
   if (!currentWeaponId) equipRandomWeapon(false);
 });
 
@@ -662,12 +671,10 @@ let paused = false;
 function openPauseMenu() {
   if (!joined || paused || !endPanel.classList.contains('hidden')) return;
   paused = true;
-  intentionalUnlock = true;
   document.exitPointerLock?.();
   pausePanel.classList.remove('hidden');
 }
 function armMouseLook(delayMs = 120) {
-  // 重新获得 pointer lock 后，前几帧 movement 常有异常尖峰
   mouseLookReadyAt = performance.now() + delayMs;
 }
 function closePauseMenu(resume = true) {
@@ -675,7 +682,6 @@ function closePauseMenu(resume = true) {
   paused = false;
   pausePanel.classList.add('hidden');
   if (resume && joined && alive && endPanel.classList.contains('hidden')) {
-    intentionalUnlock = false;
     armMouseLook();
     document.body.requestPointerLock();
   }
@@ -694,18 +700,18 @@ function nicknameTag(name, team = null) {
   const canvas = document.createElement('canvas'); canvas.width = 384; canvas.height = 80;
   const context = canvas.getContext('2d');
   context.font = '700 42px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
-  // 黑描边 + 阵营色字，远距离更可读
   context.lineWidth = 7; context.strokeStyle = 'rgba(0, 0, 0, .72)'; context.strokeText(name, 192, 40);
-  context.fillStyle = team === 'red' ? '#ff7a8a' : team === 'blue' ? '#7cbcff' : '#ffffff';
+  if (team === 'red') context.fillStyle = '#ff7a8a';
+  else if (team === 'blue') context.fillStyle = '#7cbcff';
+  else context.fillStyle = '#ffffff';
   context.fillText(name, 192, 40);
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, depthWrite: false }));
   sprite.position.y = 2.5; sprite.scale.set(2.25, .48, 1); return sprite;
 }
 
-// 头顶阵营光点：提升敌人/队友辨识
 function teamMarker(team) {
   if (!team) return null;
-  const color = team === 'red' ? PALETTE.red : PALETTE.blue;
+  const color = teamColor(team);
   const m = new THREE.Mesh(
     new THREE.SphereGeometry(.1, 10, 10),
     new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.85, roughness: .35, metalness: .1 })
@@ -715,15 +721,16 @@ function teamMarker(team) {
   return m;
 }
 
-// 远端玩家：Generic Male，未加载完时用胶囊体占位
 function createPlayerModel(id, name, team = null) {
   const group = new THREE.Group();
-  group.add(nicknameTag(name, team)); group.userData.playerId = id; group.userData.team = team;
-  const marker = teamMarker(team); if (marker) group.add(marker);
+  group.add(nicknameTag(name, team));
+  group.userData.playerId = id;
+  group.userData.team = team;
+  const marker = teamMarker(team);
+  if (marker) group.add(marker);
   if (soldierReady && soldierTemplate) attachSoldier(group, id, team);
   else {
-    const color = team === 'red' ? PALETTE.red : team === 'blue' ? PALETTE.blue : PALETTE.accent;
-    const fallback = new THREE.Mesh(new THREE.CapsuleGeometry(.42, 1.1, 5, 10), makeMat(color, 'wall'));
+    const fallback = new THREE.Mesh(new THREE.CapsuleGeometry(.42, 1.1, 5, 10), makeMat(teamColor(team), 'wall'));
     fallback.position.y = 1.05; fallback.castShadow = true; fallback.userData.playerId = id;
     group.add(fallback); group.userData.fallback = fallback;
   }
@@ -816,16 +823,36 @@ function lineBlocked(x1, z1, x2, z2) {
   });
 }
 
-function spotEnemy(id) { if (id && id !== myId) spottedEnemies.set(id, performance.now() + SPOT_DURATION); }
+function spotEnemy(id, duration = SPOT_DURATION) {
+  if (!id || id === myId) return;
+  const until = performance.now() + duration;
+  const prev = spottedEnemies.get(id) || 0;
+  spottedEnemies.set(id, Math.max(prev, until));
+}
+function revealFire(id, duration = FIRE_REVEAL_MS) {
+  if (!id) return;
+  if (id === myId) {
+    selfFireRevealUntil = Math.max(selfFireRevealUntil, performance.now() + duration);
+    return;
+  }
+  const until = performance.now() + duration;
+  fireReveals.set(id, Math.max(fireReveals.get(id) || 0, until));
+  spotEnemy(id, duration); // 开火也会暴露到雷达
+}
+function isAlly(remoteData) {
+  return gameMode === 'tdm' && myTeam && remoteData?.team === myTeam;
+}
 
-// 更新可见敌人标记
+// 更新可见敌人标记 + 清理过期开火暴露
 function updateSpotted() {
   if (!joined || !alive) return;
   const now = performance.now();
   const forward = new THREE.Vector3(); camera.getWorldDirection(forward); forward.y = 0;
   if (forward.lengthSq() < 1e-6) return; forward.normalize();
   remotes.forEach((remote, id) => {
-    if (remote.data.dead) { spottedEnemies.delete(id); return; }
+    if (remote.data.dead) { spottedEnemies.delete(id); fireReveals.delete(id); return; }
+    // 队友不进敌人发现逻辑
+    if (isAlly(remote.data)) { spottedEnemies.delete(id); return; }
     const dx = remote.data.x - camera.position.x, dz = remote.data.z - camera.position.z;
     const dist = Math.hypot(dx, dz);
     if (dist > SPOT_MAX_DIST || dist < .2) return;
@@ -833,6 +860,12 @@ function updateSpotted() {
     if (!lineBlocked(camera.position.x, camera.position.z, remote.data.x, remote.data.z)) spotEnemy(id);
   });
   spottedEnemies.forEach((until, id) => { if (until < now || !remotes.has(id) || remotes.get(id).data.dead) spottedEnemies.delete(id); });
+  fireReveals.forEach((until, id) => { if (until < now || !remotes.has(id) || remotes.get(id).data.dead) fireReveals.delete(id); });
+}
+
+function drawRadarDot(ctx, x, y, color, r = 4.5, alpha = 1) {
+  ctx.fillStyle = color.replace('ALPHA', alpha);
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
 }
 
 // CS 风格圆形雷达
@@ -840,6 +873,7 @@ function drawMinimap() {
   const size = minimap.width, cx = size / 2, cy = size / 2, scale = (size * .42) / RADAR_RANGE;
   const ctx = minimapCtx, yaw = camera.rotation.y;
   ctx.clearRect(0, 0, size, size);
+  const now = performance.now();
 
   // 背景与网格
   ctx.save();
@@ -868,17 +902,36 @@ function drawMinimap() {
     ctx.fillRect(wx, wz, b.w * scale, b.d * scale);
   });
 
-  // 已发现的敌人
-  const now = performance.now();
-  spottedEnemies.forEach((until, id) => {
+  // 队友常显（TDM）
+  if (gameMode === 'tdm') {
+    remotes.forEach((remote) => {
+      if (remote.data.dead || !isAlly(remote.data)) return;
+      const [tx, tz] = toRadar(remote.data.x, remote.data.z);
+      if (Math.hypot(tx, tz) > size * .48) return;
+      drawRadarDot(ctx, tx, tz, 'rgba(74, 167, 255, ALPHA)', 4.2, 1);
+      // 队友朝向（相对自己朝向）
+      const relYaw = (remote.data.yaw || 0) - yaw;
+      ctx.strokeStyle = 'rgba(180, 220, 255, .9)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(tx, tz);
+      ctx.lineTo(tx + Math.sin(relYaw) * 7, tz + Math.cos(relYaw) * 7); ctx.stroke();
+    });
+  }
+
+  // 已发现的敌人 / 开火暴露敌人
+  const drawEnemyId = new Set([...spottedEnemies.keys(), ...fireReveals.keys()]);
+  drawEnemyId.forEach((id) => {
     const remote = remotes.get(id);
-    if (!remote || remote.data.dead) return;
+    if (!remote || remote.data.dead || isAlly(remote.data)) return;
     const [ex, ez] = toRadar(remote.data.x, remote.data.z);
     if (Math.hypot(ex, ez) > size * .48) return;
-    const alpha = Math.min(1, (until - now) / 400);
-    ctx.fillStyle = `rgba(255, 72, 88, ${alpha})`;
-    ctx.beginPath(); ctx.arc(ex, ez, 4.5, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = `rgba(255, 180, 180, ${alpha})`; ctx.lineWidth = 1; ctx.stroke();
+    const spottedUntil = spottedEnemies.get(id) || 0;
+    const fireUntil = fireReveals.get(id) || 0;
+    const until = Math.max(spottedUntil, fireUntil);
+    const alpha = Math.min(1, Math.max(0, (until - now) / 450));
+    if (alpha <= 0) return;
+    // 开火暴露用更亮的红点
+    if (fireUntil > now) drawRadarDot(ctx, ex, ez, 'rgba(255, 90, 80, ALPHA)', 5.2, alpha);
+    else drawRadarDot(ctx, ex, ez, 'rgba(255, 72, 88, ALPHA)', 4.4, alpha);
   });
 
   ctx.restore();
@@ -886,12 +939,20 @@ function drawMinimap() {
   // 自己：始终朝上的箭头
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.fillStyle = '#4cf0e8';
+  const selfColor = (selfFireRevealUntil > now) ? '#ff8f6a' : '#4cf0e8';
+  ctx.fillStyle = selfColor;
   ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(5.5, 6); ctx.lineTo(0, 3); ctx.lineTo(-5.5, 6); ctx.closePath(); ctx.fill();
   ctx.strokeStyle = '#0a2a30'; ctx.lineWidth = 1; ctx.stroke();
   // 视野扇形
   ctx.fillStyle = 'rgba(76, 240, 232, .12)';
   ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 34, -Math.PI / 2 - .55, -Math.PI / 2 + .55); ctx.closePath(); ctx.fill();
+  // 自己开火暴露环
+  if (selfFireRevealUntil > now) {
+    const a = Math.min(1, (selfFireRevealUntil - now) / 500);
+    ctx.strokeStyle = `rgba(255, 120, 90, ${a})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI * 2); ctx.stroke();
+  }
   ctx.restore();
 
   // 外圈描边
@@ -989,6 +1050,7 @@ function receive(data) {
     setCameraPos(data.x, data.y || standingHeight, data.z, 'welcome');
     armMouseLook(180);
     document.body.requestPointerLock(); equipRandomWeapon(false);
+    updateMinimapMeta();
     const mapName = data.mapName || MAP_NAMES[currentMapId] || currentMapId;
     notice(gameMode === 'tdm'
       ? `${mapName} · 团队竞技（${myTeam === 'red' ? '红方' : '蓝方'}）`
@@ -1002,7 +1064,7 @@ function receive(data) {
     board.replaceChildren(...(data.leaderboard || []).map((player, index) => {
       const item = document.createElement('li');
       item.className = player.id === myId ? 'me' : '';
-      const tag = data.mode === 'tdm' ? (player.team === 'red' ? '红' : '蓝') + ' ' : '';
+      const tag = data.mode === 'tdm' && teamLabel(player.team) ? `${teamLabel(player.team)} ` : '';
       item.textContent = `${index + 1}. ${tag}${player.name}`;
       const kills = document.createElement('b'); kills.textContent = player.kills; item.append(kills);
       return item;
@@ -1014,7 +1076,14 @@ function receive(data) {
       let r = remotes.get(p.id);
       if (!r) { r = { mesh: createPlayerModel(p.id, p.name, p.team), data: p, walking: false }; remotes.set(p.id, r); }
       r.walking = Math.hypot(p.x - r.data.x, p.z - r.data.z) > .015;
-      r.data = p; r.mesh.visible = !p.dead; r.mesh.position.set(p.x, 0, p.z); r.mesh.rotation.y = p.yaw;
+      const wasDead = !!r.data?.dead;
+      r.data = p;
+      r.mesh.visible = !p.dead;
+      r.mesh.position.set(p.x, 0, p.z);
+      r.mesh.rotation.y = p.yaw;
+      // 复活重新显示时清掉命中闪白残留
+      if (wasDead && !p.dead) clearHitFlash(r.mesh);
+      if (p.dead) clearHitFlash(r.mesh);
     });
     remotes.forEach((r, id) => { if (!seen.has(id)) { scene.remove(r.mesh); remotes.delete(id); } });
   }
@@ -1023,16 +1092,21 @@ function receive(data) {
     const next = Math.max(0, +hpEl.textContent - 34);
     hpEl.textContent = next;
     hpEl.classList.toggle('low', next <= 34);
+    setLowHpFx(next);
     const flash = document.querySelector('#damage-flash'); flash.classList.add('active'); setTimeout(() => flash.classList.remove('active'), 130);
-    // 血量归零只触发一次死亡，避免重复 die 干扰镜头
     if (next <= 0) die();
   }
   if (data.type === 'kill') {
-    const kTeam = data.killerTeam === 'red' ? '红' : data.killerTeam === 'blue' ? '蓝' : '';
-    const vTeam = data.victimTeam === 'red' ? '红' : data.victimTeam === 'blue' ? '蓝' : '';
-    const kName = kTeam ? `[${kTeam}] ${data.killerName}` : data.killerName;
-    const vName = vTeam ? `[${vTeam}] ${data.victimName}` : data.victimName;
+    const kTag = teamLabel(data.killerTeam);
+    const vTag = teamLabel(data.victimTeam);
+    const kName = kTag ? `[${kTag}] ${data.killerName}` : data.killerName;
+    const vName = vTag ? `[${vTag}] ${data.victimName}` : data.victimName;
     feed(`<strong>${kName}</strong> ▸ ${vName}`);
+    if (String(data.killer) === String(myId)) {
+      pulseCrosshair('kill');
+      showHitMarker(true);
+      showKillBanner();
+    }
     if (data.victim === myId && alive) die();
   }
   if (data.type === 'respawn' && String(data.victim) === String(myId)) {
@@ -1053,10 +1127,10 @@ function receive(data) {
     document.querySelector('.weapon strong').textContent = ammo;
     document.querySelector('#health').textContent = 100;
     document.querySelector('#health').classList.remove('low');
+    setLowHpFx(100);
     respawn.classList.add('hidden');
     equipRandomWeapon(true);
     if (!paused && endPanel.classList.contains('hidden')) {
-      intentionalUnlock = false;
       armMouseLook(180);
       document.body.requestPointerLock();
     }
@@ -1064,7 +1138,6 @@ function receive(data) {
   }
   if (data.type === 'roundEnd') {
     alive = false;
-    intentionalUnlock = true;
     document.exitPointerLock();
     if (data.mode === 'tdm') {
       const s = data.teamScores || { red: 0, blue: 0 };
@@ -1082,14 +1155,13 @@ function die() {
   if (!alive) return; // 防重入
   alive = false;
   verticalVelocity = 0;
-  // 清按键，避免复活瞬间带着旧移动状态
   for (const k of Object.keys(keys)) keys[k] = false;
+  document.querySelector('#damage-flash').classList.remove('lowhp');
   respawn.classList.remove('hidden');
   let n = 3;
   const el = document.querySelector('#respawn-count');
   el.textContent = n;
   if (pendingRespawnTimer) clearInterval(pendingRespawnTimer);
-  // 仅做倒计时 UI；真正复活以服务端 respawn 为准
   pendingRespawnTimer = setInterval(() => {
     n -= 1;
     el.textContent = Math.max(0, n);
@@ -1101,16 +1173,98 @@ function die() {
 }
 function feed(text) { const el = document.createElement('div'); el.className = 'kill'; el.innerHTML = text; document.querySelector('#kill-feed').prepend(el); setTimeout(() => el.remove(), 3500); }
 function notice(text) { const el = document.querySelector('#notice'); el.textContent = text; setTimeout(() => { if (el.textContent === text) el.textContent = ''; }, 2000); }
+
+function replayCssClass(el, addClasses, removeClasses = [], durationMs = 0) {
+  if (!el) return;
+  el.classList.remove(...addClasses, ...removeClasses);
+  void el.offsetWidth;
+  el.classList.add(...addClasses);
+  if (durationMs > 0) {
+    setTimeout(() => el.classList.remove(...addClasses), durationMs);
+  }
+}
+function pulseCrosshair(mode = 'hit') {
+  replayCssClass(document.querySelector('#crosshair'), [mode === 'kill' ? 'kill' : 'hit'], ['hit', 'kill'], 160);
+}
+function showHitMarker(isKill = false) {
+  const classes = isKill ? ['show', 'kill'] : ['show'];
+  replayCssClass(document.querySelector('#hitmarker'), classes, ['show', 'kill'], 180);
+}
+function showKillBanner() {
+  const el = document.querySelector('#kill-banner');
+  if (!el) return;
+  el.classList.remove('hidden');
+  replayCssClass(el, ['show'], ['show']);
+  setTimeout(() => {
+    el.classList.remove('show');
+    el.classList.add('hidden');
+  }, 900);
+}
+function flashRemoteHit(targetId) {
+  const remote = remotes.get(targetId);
+  if (!remote?.mesh || remote.data?.dead) return;
+  eachMaterial(remote.mesh, mat => {
+    if (!mat?.emissive) return;
+    if (mat.userData._baseEmissive == null) {
+      mat.userData._baseEmissive = mat.emissive.getHex();
+      mat.userData._baseEmissiveIntensity = mat.emissiveIntensity ?? 0;
+    }
+    const base = mat.userData._baseEmissive;
+    const baseI = mat.userData._baseEmissiveIntensity ?? 0;
+    mat.emissive.setHex(0xffffff);
+    mat.emissiveIntensity = 1.1;
+    if (mat.userData._flashTimer) clearTimeout(mat.userData._flashTimer);
+    mat.userData._flashTimer = setTimeout(() => {
+      mat.userData._flashTimer = null;
+      mat.emissive.setHex(base);
+      mat.emissiveIntensity = baseI;
+    }, 90);
+  });
+}
+function clearHitFlash(root) {
+  if (!root) return;
+  eachMaterial(root, mat => {
+    if (!mat?.emissive) return;
+    if (mat.userData._flashTimer) {
+      clearTimeout(mat.userData._flashTimer);
+      mat.userData._flashTimer = null;
+    }
+    if (mat.userData._baseEmissive != null) {
+      mat.emissive.setHex(mat.userData._baseEmissive);
+      mat.emissiveIntensity = mat.userData._baseEmissiveIntensity ?? 0;
+    }
+  });
+}
+function updateMinimapMeta() {
+  const modeEl = document.querySelector('#minimap-mode');
+  const mapEl = document.querySelector('#minimap-map');
+  if (modeEl) {
+    if (gameMode === 'tdm') modeEl.textContent = myTeam === 'red' ? '团队·红' : '团队·蓝';
+    else modeEl.textContent = '死斗';
+  }
+  if (mapEl) mapEl.textContent = MAP_NAMES[currentMapId] || currentMapId;
+}
+function setLowHpFx(hp) {
+  document.querySelector('#damage-flash')?.classList.toggle('lowhp', hp > 0 && hp <= 34);
+}
+
 function addShotEffect(end) {
   const origin = new THREE.Vector3(); muzzle.getWorldPosition(origin);
-  const direction = end.clone().sub(origin); const length = direction.length();
+  const direction = end.clone().sub(origin); const length = Math.max(direction.length(), 0.01);
   const tracer = new THREE.Mesh(new THREE.CylinderGeometry(.012, .025, length, 5), new THREE.MeshBasicMaterial({ color: 0xffdf72, transparent: true }));
   tracer.position.copy(origin).addScaledVector(direction, .5); tracer.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize()); scene.add(tracer); effects.push({ mesh: tracer, life: .055 });
-  // 枪口光不投射阴影，避免把残留物体“闪”出来
   const flash = new THREE.PointLight(0xffc34d, 3.2, 4); flash.castShadow = false; flash.position.copy(origin); scene.add(flash); effects.push({ mesh: flash, life: .035 });
 }
-function addImpact(point) {
-  const spark = new THREE.Mesh(new THREE.SphereGeometry(.11, 6, 6), new THREE.MeshBasicMaterial({ color: 0xff2d45, transparent: true })); spark.position.copy(point); scene.add(spark); effects.push({ mesh: spark, life: .16, expand: true });
+function addImpact(point, isPlayer = false) {
+  const color = isPlayer ? 0xff3b54 : 0xff2d45;
+  const spark = new THREE.Mesh(new THREE.SphereGeometry(isPlayer ? .14 : .11, 6, 6), new THREE.MeshBasicMaterial({ color, transparent: true }));
+  spark.position.copy(point); scene.add(spark); effects.push({ mesh: spark, life: isPlayer ? .2 : .16, expand: true });
+  if (isPlayer) {
+    // 命中额外爆点环
+    const ring = new THREE.Mesh(new THREE.RingGeometry(.05, .16, 12), new THREE.MeshBasicMaterial({ color: 0xffd36a, transparent: true, side: THREE.DoubleSide }));
+    ring.position.copy(point); ring.lookAt(camera.position);
+    scene.add(ring); effects.push({ mesh: ring, life: .18, expand: true });
+  }
 }
 function findPlayerId(obj) {
   let o = obj;
@@ -1120,20 +1274,32 @@ function findPlayerId(obj) {
 function shoot() {
   if (!alive || reloading || !ammo || paused || performance.now() - lastShot < 115) return;
   lastShot = performance.now(); gunKick = 1; ammo--; document.querySelector('.weapon strong').textContent = ammo;
+  // 开火暴露自己到雷达
+  revealFire(myId);
   raycaster.setFromCamera(new THREE.Vector2(), camera);
   const direction = new THREE.Vector3(); camera.getWorldDirection(direction);
   const end = camera.position.clone().addScaledVector(direction, 45);
-  // 团队模式：只能瞄准敌方
   const targets = [...remotes.values()].filter(r => {
     if (r.data.dead) return false;
-    if (gameMode === 'tdm' && myTeam && r.data.team === myTeam) return false;
+    if (isAlly(r.data)) return false;
     return true;
   }).map(r => r.mesh);
   const hit = raycaster.intersectObjects(targets, true)[0];
   if (hit) {
-    end.copy(hit.point); addImpact(hit.point);
+    end.copy(hit.point);
     const targetId = findPlayerId(hit.object);
-    if (targetId) { spotEnemy(targetId); socket.send(JSON.stringify({ type: 'shoot', target: targetId })); }
+    const isPlayer = !!targetId;
+    addImpact(hit.point, isPlayer);
+    if (targetId) {
+      spotEnemy(targetId);
+      revealFire(targetId, 1200);
+      flashRemoteHit(targetId);
+      pulseCrosshair('hit');
+      showHitMarker(false);
+      socket.send(JSON.stringify({ type: 'shoot', target: targetId }));
+    }
+  } else {
+    addImpact(end, false);
   }
   addShotEffect(end); if (!ammo) reload();
 }
@@ -1199,10 +1365,7 @@ addEventListener('mousedown', () => {
 });
 // 暂停只由 ESC 显式触发；锁鼠成功后重新武装鼠标输入
 document.addEventListener('pointerlockchange', () => {
-  if (document.pointerLockElement) {
-    intentionalUnlock = false;
-    armMouseLook(100);
-  }
+  if (document.pointerLockElement) armMouseLook(100);
 });
 // 大厅：模式 / 阵营选择
 document.querySelectorAll('#mode-pick .mode-btn').forEach(btn => {
