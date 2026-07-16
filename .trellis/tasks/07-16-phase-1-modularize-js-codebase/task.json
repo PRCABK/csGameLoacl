@@ -1,0 +1,30 @@
+{
+  "id": "phase-1-modularize-js-codebase",
+  "name": "phase-1-modularize-js-codebase",
+  "title": "Phase 1 Modularize JS Codebase",
+  "description": "Refactor the existing JavaScript codebase in place by splitting large client/server files into maintainable modules without changing gameplay, protocol, or language.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "pe",
+  "assignee": "pe",
+  "createdAt": "2026-07-16",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-16-client-module-split",
+    "07-16-server-module-split",
+    "07-16-modularization-integration-verification"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
