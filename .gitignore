@@ -1,3 +1,13 @@
 node_modules/
 .env
 .DS_Store
+
+# 根目录临时模型（请放到 models/ 后再接入）
+/*.glb
+/*.fbx
+/*.obj
+/*.mtl
+
+# 旧 OBJ 资源目录
+Container_v2_L2.*/
+models/container/
