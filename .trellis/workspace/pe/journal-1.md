@@ -82,3 +82,36 @@ Split the CommonJS server into maps, rooms, snapshots, static files, combat, and
 ### Next Steps
 
 - None - task complete
+
+
+## Session 2: Modularization integration verification
+
+**Date**: 2026-07-16
+**Task**: Modularization integration verification
+**Branch**: `main`
+
+### Summary
+
+Verified all split JavaScript modules, dependency integrity, root npm start, HTTP assets and 404 behavior, and a two-client WebSocket lifecycle; updated README structure and recorded browser/LAN manual limits.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `29732f5` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
