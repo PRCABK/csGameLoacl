@@ -3,288 +3,151 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NEON STRIKE · 局域网 3D 对战</title>
-  <meta name="description" content="NEON STRIKE：浏览器局域网 3D 第一人称对战。死斗/团队竞技、多地图、CS 风雷达、即开即玩。" />
-  <meta property="og:title" content="NEON STRIKE · 局域网 3D 对战" />
-  <meta property="og:description" content="低模战术风局域网 FPS。Three.js + Node.js WebSocket。" />
+  <title>NEON STRIKE · 浏览器局域网 FPS</title>
+  <meta name="description" content="NEON STRIKE 是一款浏览器局域网 3D FPS：死斗、团队竞技、四张地图，即开即玩。" />
+  <meta property="og:title" content="NEON STRIKE · 浏览器局域网 FPS" />
+  <meta property="og:description" content="和朋友在浏览器里开一局真正的局域网对战。" />
   <meta property="og:type" content="website" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Orbitron:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <div class="fx">
-    <div class="fx-noise"></div>
-    <div class="fx-vignette"></div>
-    <div class="fx-orb fx-orb-1"></div>
-    <div class="fx-orb fx-orb-2"></div>
-    <div class="fx-orb fx-orb-3"></div>
-  </div>
-
-  <header class="nav glass">
-    <a class="logo" href="#top">
-      <span class="logo-mark">NS</span>
-      <span class="logo-text">NEON <em>STRIKE</em></span>
-    </a>
-    <nav class="nav-links">
-      <a href="#features">Features</a>
-      <a href="#modes">Modes</a>
-      <a href="#maps">Maps</a>
-      <a href="#start">Start</a>
+  <div class="page-grid" aria-hidden="true"></div>
+  <header class="site-header">
+    <a class="brand" href="#top"><span class="brand-mark">N</span>NEON STRIKE</a>
+    <nav aria-label="主导航">
+      <a href="#modes">模式</a>
+      <a href="#maps">地图</a>
+      <a href="#system">系统</a>
     </nav>
-    <a class="btn btn-solid" href="https://github.com/PRCABK/csGameLoacl" target="_blank" rel="noopener">GitHub</a>
+    <a class="repo-link" href="https://github.com/PRCABK/csGameLoacl" target="_blank" rel="noopener">GitHub <span>↗</span></a>
   </header>
 
   <main id="top">
     <section class="hero">
-      <div class="hero-copy">
-        <div class="pill">LAN FPS · Browser Native · Open Source</div>
-        <h1>
-          <span class="line">浏览器里的</span>
-          <span class="line accent">霓虹战术竞技场</span>
-        </h1>
-        <p class="lead">
-          一键启动，局域网开黑。死斗与团队竞技，四张地图自由切换。
-          CS 风雷达、击杀反馈、低模角色，专为朋友局设计。
-        </p>
-        <div class="cta-row">
-          <a class="btn btn-primary" href="#start">立即开黑</a>
-          <a class="btn btn-outline" href="https://github.com/PRCABK/csGameLoacl" target="_blank" rel="noopener">浏览源码</a>
-        </div>
-        <div class="metric-row">
-          <div class="metric"><strong>2</strong><span>对战模式</span></div>
-          <div class="metric"><strong>4</strong><span>战术地图</span></div>
-          <div class="metric"><strong>&lt;1min</strong><span>部署上线</span></div>
-        </div>
-      </div>
-
-      <div class="hero-stage">
-        <div class="stage-frame glass">
-          <div class="stage-top">
-            <span class="dot red"></span><span class="dot yellow"></span><span class="dot cyan"></span>
-            <em>MATCH LIVE</em>
+      <div class="hero-meta"><span class="live-dot"></span> SERVER STATUS: READY <i></i> BROWSER LAN FPS</div>
+      <div class="hero-layout">
+        <div class="hero-copy">
+          <p class="eyebrow">DEPLOY. CONNECT. STRIKE.</p>
+          <h1>开一局<br /><strong>真正的局域网对战</strong></h1>
+          <p class="hero-description">没有安装包，没有匹配等待。启动服务，告诉朋友你的 IP，在浏览器里直接开战。</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#start">开始部署 <span>↓</span></a>
+            <a class="button button-quiet" href="https://github.com/PRCABK/csGameLoacl" target="_blank" rel="noopener">查看项目</a>
           </div>
-          <div class="stage-body">
-            <div class="scoreboard">
-              <div class="side red"><b>14</b><small>RED</small></div>
-              <div class="timer">05:41</div>
-              <div class="side blue"><b>11</b><small>BLUE</small></div>
-            </div>
+          <div class="numbers" aria-label="项目数据">
+            <div><b>02</b><span>对战模式</span></div>
+            <div><b>04</b><span>战术地图</span></div>
+            <div><b>LAN</b><span>即时联机</span></div>
+          </div>
+        </div>
 
-            <div class="stage-main">
-              <div class="radar-panel">
-                <div class="radar">
-                  <div class="ring"></div>
-                  <div class="ring r2"></div>
-                  <div class="ring r3"></div>
-                  <div class="sweep"></div>
-                  <div class="blip me"></div>
-                  <div class="blip foe f1"></div>
-                  <div class="blip foe f2"></div>
-                  <div class="blip mate m1"></div>
-                </div>
-                <div class="radar-meta">
-                  <span>团队·蓝</span>
-                  <span>炽热沙城</span>
-                </div>
-              </div>
-
-              <div class="combat-feed">
-                <div class="chip kill">ENEMY DOWN</div>
-                <div class="kill-line"><strong>Nova</strong> ▸ Drift</div>
-                <div class="kill-line"><strong>Rookie</strong> ▸ Ghost</div>
-                <div class="weapon">
-                  <span>SCIFI AR</span>
-                  <b>24</b>
-                  <small>/ ∞</small>
-                </div>
-              </div>
-            </div>
-
-            <div class="stage-bottom">
-              <div class="hp"><i></i><span>HP 66</span></div>
-              <div class="cross">+</div>
-              <div class="hint">TAB 计分板 · ESC 回大厅</div>
-            </div>
+        <div class="match-screen" aria-label="NEON STRIKE 对战界面预览">
+          <div class="screen-topbar"><span>LIVE MATCH</span><span>TEAM DEATHMATCH</span><span>NEON DOCK</span></div>
+          <div class="score-strip">
+            <div class="team red-team"><span>RED</span><b>18</b></div>
+            <div class="clock"><b>06:42</b><small>ROUND TIME</small></div>
+            <div class="team blue-team"><b>16</b><span>BLUE</span></div>
+          </div>
+          <div class="arena">
+            <div class="building back-left"></div>
+            <div class="building back-right"></div>
+            <div class="container c-one"></div>
+            <div class="container c-two"></div>
+            <div class="container c-three"></div>
+            <div class="floor-line l-one"></div>
+            <div class="floor-line l-two"></div>
+            <div class="floor-line l-three"></div>
+            <div class="enemy-silhouette"><span></span><i></i></div>
+            <div class="crosshair"><i></i><i></i><i></i><i></i></div>
+            <div class="kill-notice">ENEMY DOWN</div>
+            <div class="kill-feed"><b>NOVA</b> <span>▸</span> GHOST<br /><b>ROOKIE</b> <span>▸</span> DRIFT</div>
+          </div>
+          <div class="screen-bottom">
+            <div class="health"><b>66</b><span>HP</span><i></i></div>
+            <div class="ammo"><span>SCIFI AR</span><b>24</b><small>/ 120</small></div>
           </div>
         </div>
       </div>
+      <div class="scroll-cue"><span></span> SCROLL TO DEPLOY</div>
     </section>
 
-    <section id="features" class="section">
-      <div class="section-head">
-        <p class="kicker">Why it hits different</p>
-        <h2>打起来爽，看信息也清楚</h2>
+    <section id="modes" class="section modes-section">
+      <div class="section-label"><span>01</span> PLAY YOUR WAY</div>
+      <div class="section-intro">
+        <h2>选好地图，<br />直接交火。</h2>
+        <p>大厅选模式、阵营和战场。房间按模式与地图独立运行，空房自动回收。</p>
       </div>
-      <div class="bento">
-        <article class="tile tile-lg">
-          <p class="kicker">Combat Feedback</p>
-          <h3>每一次交火都有反馈</h3>
-          <p>准星变色、Hitmarker、击杀横幅、命中闪白、低血量脉冲。不是“打中了”，而是“打爽了”。</p>
-          <div class="mini-ui">
-            <span class="hit">HIT</span>
-            <span class="banner">ENEMY DOWN</span>
-          </div>
+      <div class="mode-list">
+        <article class="mode-item deathmatch">
+          <div class="mode-index">01</div>
+          <div><p>FREE FOR ALL</p><h3>死斗</h3></div>
+          <p class="mode-description">所有人都是敌人。不断复活、持续交火，最后由击杀榜决定胜负。</p>
+          <ul><li>个人击杀统计</li><li>全员实时榜单</li><li>10 分钟结算</li></ul>
         </article>
-        <article class="tile">
-          <p class="kicker">Radar</p>
-          <h3>CS 风圆形雷达</h3>
-          <p>朝向扇形、发现敌人、开火暴露、队友常显。</p>
-        </article>
-        <article class="tile">
-          <p class="kicker">Identity</p>
-          <h3>阵营可读性</h3>
-          <p>红蓝染色、头顶标识、计分板分列，远处也分得清。</p>
-        </article>
-        <article class="tile">
-          <p class="kicker">Deploy</p>
-          <h3>即开即玩</h3>
-          <p>Node 一键启动，浏览器直连，宿舍局最友好。</p>
-        </article>
-        <article class="tile">
-          <p class="kicker">Stack</p>
-          <h3>Three.js + WS</h3>
-          <p>前端 Three.js，后端 Node WebSocket，结构清晰好改。</p>
+        <article class="mode-item tdm">
+          <div class="mode-index">02</div>
+          <div><p>RED VS BLUE</p><h3>团队竞技</h3></div>
+          <p class="mode-description">选择红蓝阵营，围绕队伍比分推进。同队无误伤，配合赢下战局。</p>
+          <ul><li>阵营出生点</li><li>队伍比分追踪</li><li>分队战报</li></ul>
         </article>
       </div>
     </section>
 
-    <section id="modes" class="section">
-      <div class="section-head center">
-        <p class="kicker">Game Modes</p>
-        <h2>两种模式，一套操作</h2>
-      </div>
-      <div class="mode-row">
-        <article class="mode glass">
-          <div class="mode-badge cyan">DEATHMATCH</div>
-          <h3>死斗</h3>
-          <p>所有人互为敌人。拼预瞄、拼走位、拼击杀榜。</p>
-          <ul>
-            <li>个人击杀统计</li>
-            <li>Tab 全员榜</li>
-            <li>10 分钟结算</li>
-          </ul>
-        </article>
-        <article class="mode glass">
-          <div class="mode-badge red">TEAM DEATHMATCH</div>
-          <h3>团队竞技</h3>
-          <p>红蓝对抗，同队无误伤。比的是站位与节奏。</p>
-          <ul>
-            <li>红蓝分侧出生</li>
-            <li>顶部队伍总分</li>
-            <li>Tab 分队战报</li>
-          </ul>
-        </article>
+    <section id="maps" class="section map-section">
+      <div class="section-label"><span>02</span> BATTLEFIELDS</div>
+      <div class="map-head"><h2>四张战场。<br /><em>四种交火节奏。</em></h2><p>从集装箱码头到封闭仓库，每张图都有不同的推进路线与火力角度。</p></div>
+      <div class="map-rail">
+        <article class="map-card dock"><div class="map-number">01</div><div><h3>霓虹码头</h3><p>NEON DOCK</p></div><span>集装箱掩体 / 快速转点</span></article>
+        <article class="map-card desert"><div class="map-number">02</div><div><h3>炽热沙城</h3><p>DUST CITY</p></div><span>中路对枪 / 双侧包抄</span></article>
+        <article class="map-card town"><div class="map-number">03</div><div><h3>风情小镇</h3><p>OLD TOWN</p></div><span>街巷缠斗 / 交叉火力</span></article>
+        <article class="map-card warehouse"><div class="map-number">04</div><div><h3>货运仓库</h3><p>WAREHOUSE</p></div><span>走廊卡点 / 近距突袭</span></article>
       </div>
     </section>
 
-    <section id="maps" class="section">
-      <div class="section-head">
-        <p class="kicker">Battlefields</p>
-        <h2>四张地图，切换即战</h2>
-      </div>
-      <div class="maps">
-        <article class="map m1">
-          <div class="map-body">
-            <h3>霓虹码头</h3>
-            <p>集装箱掩体，经典混战骨架。</p>
-          </div>
-        </article>
-        <article class="map m2">
-          <div class="map-body">
-            <h3>炽热沙城</h3>
-            <p>中路对枪，两侧包抄。</p>
-          </div>
-        </article>
-        <article class="map m3">
-          <div class="map-body">
-            <h3>风情小镇</h3>
-            <p>街巷缠斗，交叉火力。</p>
-          </div>
-        </article>
-        <article class="map m4">
-          <div class="map-body">
-            <h3>货运仓库</h3>
-            <p>走廊卡点，快速转火。</p>
-          </div>
-        </article>
+    <section id="system" class="section system-section">
+      <div class="section-label"><span>03</span> COMBAT SYSTEM</div>
+      <div class="systems">
+        <article><span class="system-number">A1</span><h3>击中就有回应</h3><p>Hitmarker、准星变色、命中闪白、击杀横幅和低血量脉冲，让每次命中都明确可感。</p></article>
+        <article><span class="system-number">B2</span><h3>信息优势由你掌握</h3><p>CS 风圆形雷达显示朝向、可见敌人和开火暴露。团队模式下，队友始终在线。</p></article>
+        <article><span class="system-number">C3</span><h3>角色一眼可读</h3><p>武器随机、角色模型与红蓝阵营染色结合，混战中仍能快速识别目标。</p></article>
       </div>
     </section>
 
-    <section class="section">
-      <div class="section-head center">
-        <p class="kicker">Controls</p>
-        <h2>10 秒上手</h2>
-      </div>
-      <div class="keys">
-        <div><kbd>WASD</kbd><span>移动</span></div>
-        <div><kbd>Shift</kbd><span>奔跑</span></div>
-        <div><kbd>Space</kbd><span>跳跃</span></div>
-        <div><kbd>C</kbd><span>下蹲</span></div>
-        <div><kbd>LMB</kbd><span>射击</span></div>
-        <div><kbd>R</kbd><span>装填</span></div>
-        <div><kbd>Tab</kbd><span>计分板</span></div>
-        <div><kbd>Esc</kbd><span>暂停</span></div>
-      </div>
-    </section>
-
-    <section id="start" class="section">
-      <div class="start glass">
-        <div class="start-copy">
-          <p class="kicker">Quick Start</p>
-          <h2>三步开黑</h2>
-          <ol>
-            <li>主机运行服务</li>
-            <li>查局域网 IP</li>
-            <li>朋友浏览器连入</li>
-          </ol>
-          <p class="note">同网段访问 <code>http://主机IP:3000</code></p>
+    <section id="start" class="section start-section">
+      <div class="launch-panel">
+        <div class="launch-copy">
+          <div class="section-label"><span>04</span> LAUNCH SEQUENCE</div>
+          <h2>三行命令。<br />一片战区。</h2>
+          <p>主机启动后，同一网络里的朋友访问你的 IPv4 地址加 <code>:3000</code> 即可加入。</p>
+          <div class="launch-steps"><span>01 启动服务</span><span>02 获取主机 IP</span><span>03 浏览器连入</span></div>
         </div>
         <div class="terminal">
-          <div class="terminal-bar">
-            <span></span><span></span><span></span>
-            <em>neon-strike — zsh</em>
-            <button type="button" id="copy-cmd">Copy</button>
-          </div>
-<pre id="start-cmd">git clone https://github.com/PRCABK/csGameLoacl.git
-cd csGameLoacl
-npm install
-npm start</pre>
-        </div>
-      </div>
-    </section>
-
-    <section class="section final">
-      <div class="final-card glass">
-        <p class="kicker">Open Source</p>
-        <h2>把这片战区，改成你们的版本</h2>
-        <p>源码开放，欢迎 Fork / Issue / PR。适合学 Three.js、WebSocket 与局域网联机。</p>
-        <div class="cta-row center">
-          <a class="btn btn-primary" href="https://github.com/PRCABK/csGameLoacl" target="_blank" rel="noopener">打开仓库</a>
-          <a class="btn btn-outline" href="https://github.com/PRCABK/csGameLoacl#readme" target="_blank" rel="noopener">阅读文档</a>
+          <div class="terminal-header"><span><i></i><i></i><i></i></span><b>terminal / neon-strike</b><button type="button" id="copy-cmd">COPY</button></div>
+<pre id="start-cmd"><span>$</span> git clone https://github.com/PRCABK/csGameLoacl.git
+<span>$</span> cd csGameLoacl
+<span>$</span> npm install && npm start</pre>
+          <div class="terminal-result">✓ server listening at http://localhost:3000</div>
         </div>
       </div>
     </section>
   </main>
 
-  <footer class="footer">
-    <span>NEON STRIKE</span>
-    <a href="https://github.com/PRCABK/csGameLoacl" target="_blank" rel="noopener">github.com/PRCABK/csGameLoacl</a>
-  </footer>
+  <footer><a class="brand" href="#top"><span class="brand-mark">N</span>NEON STRIKE</a><span>BUILT WITH THREE.JS + WEBSOCKET</span><a href="https://github.com/PRCABK/csGameLoacl" target="_blank" rel="noopener">SOURCE CODE ↗</a></footer>
 
   <script>
-    const btn = document.getElementById('copy-cmd');
-    const cmd = document.getElementById('start-cmd');
-    btn?.addEventListener('click', async () => {
+    const button = document.getElementById('copy-cmd');
+    const command = document.getElementById('start-cmd');
+    button?.addEventListener('click', async () => {
       try {
-        await navigator.clipboard.writeText(cmd.innerText);
-        btn.textContent = 'Copied';
-        setTimeout(() => { btn.textContent = 'Copy'; }, 1400);
+        await navigator.clipboard.writeText(command.innerText);
+        button.textContent = 'COPIED';
       } catch {
-        btn.textContent = 'Failed';
-        setTimeout(() => { btn.textContent = 'Copy'; }, 1400);
+        button.textContent = 'FAILED';
       }
+      setTimeout(() => { button.textContent = 'COPY'; }, 1400);
     });
   </script>
 </body>
